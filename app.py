@@ -18,7 +18,7 @@ def connect_gsheet():
         creds_dict = st.secrets["gcp_service_account"] 
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        spreadsheet_id = "1B5NE0ULV9LFGw6qHNtog4jgjxtA4x2JLYgCXQ6M1P-M" 
+        spreadsheet_id = "1B5NE0ULV9LFGw6qHNtog4JgjxtA4x2JLYgCXQ6M1P-M" 
         return client.open_by_key(spreadsheet_id).get_worksheet(0)
     except Exception as e:
         st.error(f"Lỗi kết nối hệ thống: {e}")
@@ -242,3 +242,4 @@ if sheet:
                                data=export_excel_styled(unit_df), 
                                file_name=f"{type_name}_ToanDonVi_{sel_week.replace(' ','')}.xlsx",
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
