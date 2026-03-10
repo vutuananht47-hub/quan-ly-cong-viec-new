@@ -13,12 +13,14 @@ st.set_page_config(layout="wide", page_title="QUẢN LÝ CÔNG VIỆC WEB")
 def connect_gsheet():
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+        # Đọc trực tiếp từ Secrets của Streamlit
+        creds_dict = st.secrets["gcp_service_account"] 
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        spreadsheet_id = "1B5NE0ULV9LFGw6qHNtog4JgjxtA4x2JLYgCXQ6M1P-M" 
+        spreadsheet_id = "1B5NE0ULV9LFGw6qHNtog4jgjxtA4x2JLYgCXQ6M1P-M" 
         return client.open_by_key(spreadsheet_id).get_worksheet(0)
     except Exception as e:
-        st.error(f"Lỗi kết nối: {e}")
+        st.error(f"Lỗi kết nối hệ thống: {e}")
         return None
 
 sheet = connect_gsheet()
@@ -147,4 +149,5 @@ if sheet:
             st.download_button("📥 Tải Excel Toàn Đơn Vị", 
                                data=export_excel_styled(unit_df), 
                                file_name=f"{type_name}_ToanDonVi_{sel_week.replace(' ','')}.xlsx",
+
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
