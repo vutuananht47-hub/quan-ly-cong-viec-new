@@ -19,8 +19,9 @@ def connect_gsheet():
         st.error(f"Lỗi kết nối: {e}")
         return None
 
-# --- HÀM XUẤT EXCEL CÓ CỘT SẢN PHẨM ---
+# --- HÀM XUẤT EXCEL (Sản phẩm sau Trạng thái) ---
 def export_excel_styled(df):
+    # Đổi thứ tự: Trạng thái (status) -> Sản phẩm (product)
     cols_order = ['stt', 'team', 'staff', 'content', 'leader', 'progress', 'status', 'product']
     for c in cols_order:
         if c not in df.columns: df[c] = ""
@@ -46,8 +47,9 @@ def export_excel_styled(df):
 
         worksheet.set_column('A:A', 6, cell_fmt)
         worksheet.set_column('B:C', 18, cell_fmt)
-        worksheet.set_column('D:E', 40, cell_fmt) # Cột Nội dung và Sản phẩm rộng 40
-        worksheet.set_column('F:H', 18, cell_fmt)
+        worksheet.set_column('D:D', 45, cell_fmt) # Nội dung
+        worksheet.set_column('E:G', 18, cell_fmt) # Lãnh đạo, Tiến độ, Trạng thái
+        worksheet.set_column('H:H', 40, cell_fmt) # Sản phẩm ở cuối
 
     return output.getvalue()
 
@@ -69,13 +71,20 @@ if sheet:
     staff_list = ["Văn Đức Giao", "Nguyễn Xuân Khánh", "Lê Nguyễn Hạnh Nhi", "Kiều Quang Phương", "Phan Văn Long", "Trần Hoàng Anh", "Trần Hồng Nhung", "Vũ Tuấn Anh", "Bùi Thành Tâm", "Trương Bình Minh", "Hoàng Thị Sinh", "Nguyễn Ngọc Thắng", "Đỗ Hoài Nam", "Lê Tĩnh", "Trương Thị Ngọc Linh", "Tạ Ngọc Thành", "Phùng Hữu Thọ", "Võ Xuân Quý"]
     sel_staff = st.sidebar.selectbox("Cán bộ:", staff_list)
 
-    # Lọc dữ liệu
+    # Lọc dữ liệu hiển thị
     filtered_df = all_data[(all_data['team'] == sel_team) & (all_data['week'] == sel_week) & 
                            (all_data['type'] == sel_type) & (all_data['staff'] == sel_staff)] if not all_data.empty else pd.DataFrame()
 
     st.header(f"📋 {sel_type}: {sel_staff}")
 
-    # CHỌN DÒNG THAO TÁC
+    # TỰ ĐỘNG SINH STT
+    suggested_stt = 1
+    if not filtered_df.empty:
+        try:
+            suggested_stt = int(pd.to_numeric(filtered_df['stt']).max()) + 1
+        except:
+            suggested_stt = len(filtered_df) + 1
+
     options = ["-- Thêm mới --"] + filtered_df['stt'].astype(str).tolist()
     selected_stt = st.selectbox("Chọn STT để Sửa/Xóa:", options)
 
@@ -87,9 +96,9 @@ if sheet:
             v_stt, v_leader, v_status = str(row['stt']), row['leader'], row['status']
             v_content, v_progress, v_product = row['content'], row['progress'], row.get('product', "")
         else:
-            v_stt, v_leader, v_status, v_content, v_progress, v_product = "", "", "🔵 Mới", "", "", ""
+            v_stt, v_leader, v_status, v_content, v_progress, v_product = str(suggested_stt), "", "🔵 Mới", "", "", ""
 
-        stt = col1.text_input("STT", value=v_stt)
+        stt = col1.text_input("STT (Bắt buộc)", value=v_stt)
         leader = col2.text_input("Lãnh đạo chỉ đạo", value=v_leader)
         status = col3.selectbox("Trạng thái", ["🔵 Mới", "🟢 Hoàn thành", "🔴 Trễ hạn", "🟡 Đang làm"], 
                                 index=["🔵 Mới", "🟢 Hoàn thành", "🔴 Trễ hạn", "🟡 Đang làm"].index(v_status))
@@ -104,37 +113,48 @@ if sheet:
         btn_del = st.form_submit_button("🗑️ XÓA DÒNG")
 
         if btn_save:
-            # Gồm 10 cột theo thứ tự Sheet
-            new_row = [sel_team, sel_type, sel_week, sel_staff, stt, content, leader, progress, status, product]
-            
-            if selected_stt == "-- Thêm mới --":
-                sheet.append_row(new_row)
-                # TỰ ĐỘNG ĐỒNG BỘ SANG BÁO CÁO
-                if sel_type == "Đăng ký công việc":
-                    sync_row = [sel_team, "Báo cáo công việc", sel_week, sel_staff, stt, content, leader, progress, status, product]
-                    sheet.append_row(sync_row)
-                    st.info("Đã tự động đồng bộ sang Báo cáo công việc!")
+            if not stt.strip():
+                st.error("Lỗi: STT không được để trống!")
             else:
-                idx = all_data[(all_data['team'] == sel_team) & (all_data['week'] == sel_week) & 
-                               (all_data['type'] == sel_type) & (all_data['staff'] == sel_staff) & 
-                               (all_data['stt'].astype(str) == selected_stt)].index[0]
-                sheet.update(f"A{idx+2}:J{idx+2}", [new_row])
-            st.rerun()
+                new_row = [sel_team, sel_type, sel_week, sel_staff, stt, content, leader, progress, status, product]
+                
+                if selected_stt == "-- Thêm mới --":
+                    sheet.append_row(new_row)
+                    if sel_type == "Đăng ký công việc":
+                        sync_row = [sel_team, "Báo cáo công việc", sel_week, sel_staff, stt, content, leader, progress, status, product]
+                        sheet.append_row(sync_row)
+                        st.info("Đã tự động đồng bộ sang Báo cáo!")
+                else:
+                    mask = (all_data['team'] == sel_team) & (all_data['week'] == sel_week) & \
+                           (all_data['type'] == sel_type) & (all_data['staff'] == sel_staff) & \
+                           (all_data['stt'].astype(str) == selected_stt)
+                    idx = all_data[mask].index[0]
+                    sheet.update(f"A{idx+2}:J{idx+2}", [new_row])
+                st.success("Đã lưu dữ liệu!")
+                st.rerun()
 
         if btn_del and selected_stt != "-- Thêm mới --":
-            idx = all_data[(all_data['team'] == sel_team) & (all_data['week'] == sel_week) & 
-                           (all_data['type'] == sel_type) & (all_data['staff'] == sel_staff) & 
-                           (all_data['stt'].astype(str) == selected_stt)].index[0]
+            mask = (all_data['team'] == sel_team) & (all_data['week'] == sel_week) & \
+                   (all_data['type'] == sel_type) & (all_data['staff'] == sel_staff) & \
+                   (all_data['stt'].astype(str) == selected_stt)
+            idx = all_data[mask].index[0]
             sheet.delete_rows(idx + 2)
             st.rerun()
 
-    # HIỂN THỊ BẢNG (TÔ ĐỎ NẾU LÀ BÁO CÁO MÀ TRẠNG THÁI MỚI)
+    # HIỂN THỊ BẢNG (TÔ ĐỎ)
     st.subheader("Bảng dữ liệu hiện tại")
     if not filtered_df.empty:
+        # Sắp xếp hiển thị theo STT số
+        try:
+            filtered_df['stt_int'] = pd.to_numeric(filtered_df['stt'])
+            display_df = filtered_df.sort_values('stt_int').drop(columns=['stt_int'])
+        except:
+            display_df = filtered_df
+
         def highlight_new(row):
             return ['color: red' if row['status'] == "🔵 Mới" and sel_type == "Báo cáo công việc" else 'color: black'] * len(row)
         
-        st.dataframe(filtered_df.style.apply(highlight_new, axis=1), use_container_width=True)
+        st.dataframe(display_df.style.apply(highlight_new, axis=1), use_container_width=True)
 
     # XUẤT EXCEL
     st.divider()
@@ -152,5 +172,3 @@ if sheet:
         if not unit_df.empty:
             st.download_button("📥 Tải Excel Toàn Đơn Vị", data=export_excel_styled(unit_df), 
                                file_name=f"{type_fn}_ToanDonVi_{sel_week}.xlsx")
-
-
