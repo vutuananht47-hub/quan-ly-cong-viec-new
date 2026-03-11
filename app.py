@@ -14,7 +14,7 @@ def connect_gsheet():
         creds_dict = st.secrets["gcp_service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        spreadsheet_id = "1B5NE0ULV9LFGw6qHNtog4JgjxtA4x2JLYgCXQ6M1P-M" 
+        spreadsheet_id = "1B5NE0ULV9LFGw6qHNtog4jgjxtA4x2JLYgCXQ6M1P-M" 
         return client.open_by_key(spreadsheet_id).get_worksheet(0)
     except Exception as e:
         st.error(f"Lỗi kết nối: {e}")
@@ -31,23 +31,20 @@ def export_excel_flexible(df, is_calendar=False):
             cols = ['stt', 'team', 'staff', 'content', 'leader', 'progress', 'status', 'product']
             labels = ['STT', 'ĐƠN VỊ/TỔ', 'HỌ VÀ TÊN', 'NỘI DUNG CÔNG VIỆC', 'LÃNH ĐẠO CHỈ ĐẠO', 'TIẾN ĐỘ/THỜI GIAN', 'TRẠNG THÁI', 'SẢN PHẨM']
         
-        # Đảm bảo có đủ cột tránh lỗi
         for c in cols:
             if c not in df.columns: df[c] = ""
         
         df_export = df[cols].copy()
-        
-        # Sắp xếp theo Tổ rồi đến STT
         try:
             df_export['stt_n'] = pd.to_numeric(df_export['stt'], errors='coerce')
             df_export = df_export.sort_values(by=['team', 'stt_n']).drop(columns=['stt_n'])
         except: pass
 
         df_export.columns = labels
-        df_export.to_excel(writer, index=False, sheet_name='Data')
+        df_export.to_excel(writer, index=False, sheet_name='BaoCao')
         
         workbook  = writer.book
-        worksheet = writer.sheets['Data']
+        worksheet = writer.sheets['BaoCao']
         header_fmt = workbook.add_format({'bold': True, 'text_wrap': True, 'align': 'center', 'valign': 'vcenter', 'fg_color': '#2980b9', 'font_color': 'white', 'border': 1})
         cell_fmt = workbook.add_format({'border': 1, 'valign': 'vcenter', 'text_wrap': True})
         
@@ -75,7 +72,6 @@ if sheet:
     staff_list = ["Văn Đức Giao", "Nguyễn Xuân Khánh", "Lê Nguyễn Hạnh Nhi", "Kiều Quang Phương", "Phan Văn Long", "Trần Hoàng Anh", "Trần Hồng Nhung", "Vũ Tuấn Anh", "Bùi Thành Tâm", "Trương Bình Minh", "Hoàng Thị Sinh", "Nguyễn Ngọc Thắng", "Đỗ Hoài Nam", "Lê Tĩnh", "Trương Thị Ngọc Linh", "Tạ Ngọc Thành", "Phùng Hữu Thọ", "Võ Xuân Quý"]
     sel_staff = st.sidebar.selectbox("Cán bộ/Người đăng ký:", staff_list)
 
-    # Lọc dữ liệu hiển thị (Bảng và Form)
     filtered_df = all_data[(all_data['team'] == sel_team) & (all_data['week'] == sel_week) & (all_data['type'] == sel_type)]
     if sel_type != "Đăng ký lịch tuần":
         filtered_df = filtered_df[filtered_df['staff'] == sel_staff]
@@ -157,47 +153,55 @@ if sheet:
     if not filtered_df.empty:
         st.dataframe(filtered_df, use_container_width=True)
 
-    # --- PHẦN XUẤT FILE CHUYÊN SÂU ---
+    # --- PHẦN XUẤT FILE VỚI TÊN FILE TỰ ĐỘNG ---
     st.divider()
     st.subheader("📥 XUẤT FILE EXCEL BÁO CÁO")
     
-    col_ex1, col_ex2 = st.columns(2)
+    # Tạo tiền tố tên file dựa trên Loại hình
+    if sel_type == "Đăng ký công việc":
+        prefix = "DangKyCongViec"
+    elif sel_type == "Báo cáo công việc":
+        prefix = "BaoCaoCongViec"
+    else:
+        prefix = "DangKyLichTuan"
+
     is_cal = (sel_type == "Đăng ký lịch tuần")
-    type_fn = "LichTuan" if is_cal else "CongViec"
+    col_ex1, col_ex2 = st.columns(2)
 
     with col_ex1:
-        # Xuất theo Tổ
         team_data = all_data[(all_data['team'] == sel_team) & (all_data['week'] == sel_week) & (all_data['type'] == sel_type)]
         if not team_data.empty:
-            st.info(f"Dữ liệu {sel_team} hiện có {len(team_data)} dòng.")
+            st.info(f"Dữ liệu {sel_team}: {len(team_data)} dòng.")
+            # Đặt tên file chi tiết
+            file_name_team = f"{prefix}_{sel_team.replace(' ', '')}_{sel_week.replace(' ', '')}.xlsx"
             st.download_button(f"📥 Tải Excel {sel_team}", data=export_excel_flexible(team_data, is_calendar=is_cal), 
-                               file_name=f"{type_fn}_{sel_team}_{sel_week}.xlsx", key="btn_team")
+                               file_name=file_name_team, key="btn_team")
         else:
-            st.warning(f"{sel_team} chưa có dữ liệu tuần này.")
+            st.warning(f"{sel_team} chưa có dữ liệu.")
 
     with col_ex2:
-        # Xuất Toàn đơn vị
         unit_data = all_data[(all_data['week'] == sel_week) & (all_data['type'] == sel_type)]
         if not unit_data.empty:
-            st.info(f"Dữ liệu Toàn đơn vị hiện có {len(unit_data)} dòng.")
+            st.info(f"Dữ liệu Toàn đơn vị: {len(unit_data)} dòng.")
+            # Đặt tên file chi tiết
+            file_name_all = f"{prefix}_ToanDonVi_{sel_week.replace(' ', '')}.xlsx"
             st.download_button("📥 Tải Excel Toàn đơn vị", data=export_excel_flexible(unit_data, is_calendar=is_cal), 
-                               file_name=f"{type_fn}_ToanDonVi_{sel_week}.xlsx", key="btn_all")
+                               file_name=file_name_all, key="btn_all")
         else:
-            st.warning("Toàn đơn vị chưa có dữ liệu tuần này.")
+            st.warning("Đơn vị chưa có dữ liệu.")
 
-    # --- PHẦN BIỂU ĐỒ (Dưới cùng) ---
+    # --- BIỂU ĐỒ ---
     st.divider()
     st.header("📈 PHÂN TÍCH HIỆU SUẤT")
     report_data = all_data[(all_data['type'] == "Báo cáo công việc") & (all_data['week'] == sel_week)]
     if not report_data.empty:
-        c_chart1, c_chart2 = st.columns(2)
-        with c_chart1:
+        c1, c2 = st.columns(2)
+        with c1:
             team_stats = report_data.groupby(['team', 'status']).size().reset_index(name='counts')
             st.plotly_chart(px.bar(team_stats, x='team', y='counts', color='status', barmode='group', title="Hiệu suất theo Tổ", color_discrete_map={"🔵 Mới": "#3498db", "🟢 Hoàn thành": "#2ecc71", "🔴 Trễ hạn": "#e74c3c", "🟡 Đang làm": "#f1c40f"}), use_container_width=True)
-        with c_chart2:
+        with c2:
             ind_data = report_data[report_data['staff'] == sel_staff]
             if not ind_data.empty:
                 ind_stats = ind_data['status'].value_counts().reset_index()
                 ind_stats.columns = ['status', 'count']
                 st.plotly_chart(px.pie(ind_stats, values='count', names='status', title=f"Tỷ lệ của {sel_staff}", color='status', color_discrete_map={"🔵 Mới": "#3498db", "🟢 Hoàn thành": "#2ecc71", "🔴 Trễ hạn": "#e74c3c", "🟡 Đang làm": "#f1c40f"}), use_container_width=True)
-
