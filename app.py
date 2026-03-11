@@ -14,7 +14,7 @@ def connect_gsheet():
         creds_dict = st.secrets["gcp_service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        spreadsheet_id = "1B5NE0ULV9LFGw6qHNtog4jgjxtA4x2JLYgCXQ6M1P-M" 
+        spreadsheet_id = "1B5NE0ULV9LFGw6qHNtog4JgjxtA4x2JLYgCXQ6M1P-M" 
         return client.open_by_key(spreadsheet_id).get_worksheet(0)
     except Exception as e:
         st.error(f"Lỗi kết nối: {e}")
@@ -200,3 +200,4 @@ if sheet:
                 ind_stats = ind_data['status'].value_counts().reset_index()
                 ind_stats.columns = ['status', 'count']
                 st.plotly_chart(px.pie(ind_stats, values='count', names='status', title=f"Tỷ lệ của {sel_staff}", color='status', color_discrete_map={"🔵 Mới": "#3498db", "🟢 Hoàn thành": "#2ecc71", "🔴 Trễ hạn": "#e74c3c", "🟡 Đang làm": "#f1c40f"}), use_container_width=True)
+
