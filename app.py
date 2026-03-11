@@ -21,13 +21,13 @@ def connect_gsheet():
 
 # --- HÀM XUẤT EXCEL CÓ CỘT SẢN PHẨM ---
 def export_excel_styled(df):
-    cols_order = ['stt', 'team', 'staff', 'content', 'product', 'leader', 'progress', 'status']
+    cols_order = ['stt', 'team', 'staff', 'content', 'leader', 'progress', 'status', 'product']
     for c in cols_order:
         if c not in df.columns: df[c] = ""
     
     df_export = df[cols_order].copy()
     df_export.columns = ['STT', 'ĐƠN VỊ/TỔ', 'HỌ VÀ TÊN', 'NỘI DUNG CÔNG VIỆC', 
-                         'SẢN PHẨM', 'LÃNH ĐẠO CHỈ ĐẠO', 'TIẾN ĐỘ/THỜI GIAN', 'TRẠNG THÁI']
+                         'LÃNH ĐẠO CHỈ ĐẠO', 'TIẾN ĐỘ/THỜI GIAN', 'TRẠNG THÁI', 'SẢN PHẨM']
 
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -152,4 +152,5 @@ if sheet:
         if not unit_df.empty:
             st.download_button("📥 Tải Excel Toàn Đơn Vị", data=export_excel_styled(unit_df), 
                                file_name=f"{type_fn}_ToanDonVi_{sel_week}.xlsx")
+
 
