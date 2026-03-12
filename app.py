@@ -69,7 +69,7 @@ if sheet:
     sel_week = st.sidebar.selectbox("Tuần:", [f"Tuần {str(i).zfill(2)}" for i in range(1, 53)], index=datetime.now().isocalendar()[1]-1)
     sel_type = st.sidebar.selectbox("Loại hình:", ["Đăng ký công việc", "Báo cáo công việc", "Đăng ký lịch tuần"])
     
-    staff_list = ["Văn Đức Giao", "Nguyễn Xuân Khánh", "Lê Nguyễn Hạnh Nhi", "Kiều Quang Phương", "Phan Văn Long", "Trần Hoàng Anh", "Trần Hồng Nhung", "Vũ Tuấn Anh", "Bùi Thành Tâm", "Trương Bình Minh", "Hoàng Thị Sinh", "Nguyễn Ngọc Thắng", "Đỗ Hoài Nam", "Lê Tĩnh", "Trương Thị Ngọc Linh", "Tạ Ngọc Thành", "Phùng Hữu Thọ", "Võ Xuân Quý"]
+    staff_list = ["Văn Đức Giao", "Nguyễn Xuân Khánh", "Lê Nguyễn Hạnh Nhi", "Kiều Quang Phương", "Phan Văn Long", "Trần Hoàng Anh", "Trần Hồng Nhung", "Vũ Tuấn Anh", "Bùi Thành Tâm", "Trương Bình Minh", "Hoàng Thị Sinh", "Hoàng Minh Sơn", "Nguyễn Ngọc Thắng", "Đỗ Hoài Nam", "Lê Tĩnh", "Trương Thị Ngọc Linh", "Tạ Ngọc Thành", "Phùng Hữu Thọ", "Võ Xuân Quý"]
     sel_staff = st.sidebar.selectbox("Cán bộ/Người đăng ký:", staff_list)
 
     filtered_df = all_data[(all_data['team'] == sel_team) & (all_data['week'] == sel_week) & (all_data['type'] == sel_type)]
@@ -205,4 +205,5 @@ if sheet:
                 ind_stats = ind_data['status'].value_counts().reset_index()
                 ind_stats.columns = ['status', 'count']
                 st.plotly_chart(px.pie(ind_stats, values='count', names='status', title=f"Tỷ lệ của {sel_staff}", color='status', color_discrete_map={"🔵 Mới": "#3498db", "🟢 Hoàn thành": "#2ecc71", "🔴 Trễ hạn": "#e74c3c", "🟡 Đang làm": "#f1c40f"}), use_container_width=True)
+
 
