@@ -7,7 +7,7 @@ import io
 import xlsxwriter
 import plotly.express as px
 
-# --- 1. KẾT NỐI HỆ THỐNG (GIỮ NGUYÊN) ---
+# --- 1. KẾT NỐI HỆ THỐNG ---
 def connect_gsheet():
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -20,7 +20,7 @@ def connect_gsheet():
         st.error(f"Lỗi kết nối: {e}")
         return None
 
-# --- 2. HÀM XUẤT EXCEL CHUYÊN NGHIỆP (GIỮ NGUYÊN) ---
+# --- 2. HÀM XUẤT EXCEL (GIỮ NGUYÊN) ---
 def export_excel_flexible(df, is_calendar=False):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -36,7 +36,6 @@ def export_excel_flexible(df, is_calendar=False):
             df_export['stt_n'] = pd.to_numeric(df_export['stt'], errors='coerce')
             df_export = df_export.sort_values(by=['team', 'stt_n']).drop(columns=['stt_n'])
         except: pass
-
         df_export.columns = labels
         df_export.to_excel(writer, index=False, sheet_name='Sheet1')
         workbook  = writer.book
@@ -49,22 +48,22 @@ def export_excel_flexible(df, is_calendar=False):
         worksheet.set_column('B:Z', 22, cell_fmt)
     return output.getvalue()
 
-# --- 3. GIAO DIỆN CHÍNH ---
-st.set_page_config(layout="wide", page_title="QUẢN LÝ CÔNG VIỆC & HIỆU SUẤT")
+# --- 3. GIAO DIỆN ---
+st.set_page_config(layout="wide", page_title="QUẢN LÝ CÔNG VIỆC")
 sheet = connect_gsheet()
 
 if sheet:
+    # Lấy dữ liệu mới nhất mỗi lần load trang
     raw_data = sheet.get_all_records()
     all_data = pd.DataFrame(raw_data) if raw_data else pd.DataFrame()
 
     # SIDEBAR
     st.sidebar.header("🔍 BỘ LỌC")
-    # Đổi tên Văn phòng thành OBSERVER theo yêu cầu
     sel_team = st.sidebar.selectbox("Đơn vị/Tổ:", ["Tổ 1", "Tổ 2", "Tổ 3", "OBSERVER"])
     sel_week = st.sidebar.selectbox("Tuần:", [f"Tuần {str(i).zfill(2)}" for i in range(1, 53)], index=datetime.now().isocalendar()[1]-1)
     sel_type = st.sidebar.selectbox("Loại hình:", ["Đăng ký công việc", "Báo cáo công việc", "Đăng ký lịch tuần"])
 
-    # XỬ LÝ DANH SÁCH CÁN BỘ THEO TỔ (MỚI BỔ SUNG)
+    # XỬ LÝ DANH SÁCH CÁN BỘ THEO TỔ
     staff_mapping = {
         "Tổ 1": ["Trần Hoàng Anh", "Trần Hồng Nhung", "Bùi Thành Tâm", "Vũ Tuấn Anh"],
         "Tổ 2": ["Nguyễn Ngọc Thắng", "Hoàng Thị Sinh", "Trương Bình Minh", "Hoàng Minh Sơn", "Lê Tĩnh", "Trương Thị Ngọc Linh", "Đỗ Hoài Nam"],
@@ -72,7 +71,9 @@ if sheet:
         "OBSERVER": ["Văn Đức Giao", "Lê Nguyễn Hạnh Nhi", "Nguyễn Xuân Khánh", "Phan Văn Long", "Kiều Quang Phương"]
     }
     current_staff_list = staff_mapping.get(sel_team, [])
-    sel_staff = st.sidebar.selectbox("Cán bộ/Người đăng ký:", current_staff_list)
+    
+    # Quan trọng: Thêm key={sel_team} để danh sách tự đổi khi chọn Tổ
+    sel_staff = st.sidebar.selectbox("Cán bộ/Người đăng ký:", current_staff_list, key=f"staff_select_{sel_team}")
 
     # Lọc dữ liệu hiển thị
     filtered_df = all_data[(all_data['team'] == sel_team) & (all_data['week'] == sel_week) & (all_data['type'] == sel_type)]
@@ -81,90 +82,96 @@ if sheet:
 
     st.header(f"📋 {sel_type}")
 
-    # STT Gợi ý (Giữ nguyên tính năng cũ)
+    # STT Gợi ý
     suggested_stt = 1
     if not filtered_df.empty:
         try: suggested_stt = int(pd.to_numeric(filtered_df['stt'], errors='coerce').max()) + 1
         except: suggested_stt = len(filtered_df) + 1
 
     options = ["-- Thêm mới --"] + sorted(filtered_df['stt'].astype(str).tolist(), key=lambda x: int(x) if x.isdigit() else 999)
-    selected_stt = st.selectbox("Chọn STT để thao tác:", options)
+    selected_stt = st.selectbox("Chọn STT để thao tác:", options, key=f"stt_select_{sel_team}_{sel_staff}_{sel_week}")
 
     # --- 4. FORM NHẬP LIỆU ---
-    with st.form(key=f"form_{selected_stt}_{sel_type}"):
+    with st.form(key=f"form_data_{sel_team}_{sel_staff}_{selected_stt}"):
         row_data = filtered_df[filtered_df['stt'].astype(str) == selected_stt].iloc[0] if selected_stt != "-- Thêm mới --" else {}
         
         if sel_type == "Đăng ký lịch tuần":
             c1, c2 = st.columns([1, 3])
-            stt = c1.text_input("STT (Bắt buộc)", value=str(row_data.get('stt', suggested_stt)))
+            stt_val = c1.text_input("STT", value=str(row_data.get('stt', suggested_stt)))
             date_time = c2.text_input("Thứ, Ngày", value=str(row_data.get('date_time', "")))
             content = st.text_area("Nội dung đăng ký", value=str(row_data.get('content', "")))
             c3, c4 = st.columns(2)
-            location = c3.text_input("Thời gian, Địa điểm", value=str(row_data.get('location', "")))
-            host = c4.text_input("Chủ trì/Chỉ đạo", value=str(row_data.get('host', "")))
+            location = c3.text_input("Địa điểm", value=str(row_data.get('location', "")))
+            host = c4.text_input("Chủ trì", value=str(row_data.get('host', "")))
             participants = st.text_area("Thành phần", value=str(row_data.get('participants', "")))
             note = st.text_input("Ghi chú", value=str(row_data.get('note', "")))
         else:
             c1, c2, c3 = st.columns([1, 2, 1])
-            stt = c1.text_input("STT (Bắt buộc)", value=str(row_data.get('stt', suggested_stt)))
+            stt_val = c1.text_input("STT", value=str(row_data.get('stt', suggested_stt)))
             leader = c2.text_input("Lãnh đạo chỉ đạo", value=str(row_data.get('leader', "")))
             status = c3.selectbox("Trạng thái", ["🔵 Mới", "🟢 Hoàn thành", "🔴 Trễ hạn", "🟡 Đang làm"], index=0)
-            ca, cb = st.columns(2)
-            content = ca.text_area("Nội dung công việc", value=str(row_data.get('content', "")))
-            product = cb.text_area("Sản phẩm", value=str(row_data.get('product', "")))
-            progress = st.text_input("Tiến độ/Thời gian", value=str(row_data.get('progress', "")))
+            content = st.text_area("Nội dung công việc", value=str(row_data.get('content', "")))
+            product = st.text_area("Sản phẩm", value=str(row_data.get('product', "")))
+            progress = st.text_input("Tiến độ", value=str(row_data.get('progress', "")))
 
         btn_save = st.form_submit_button("💾 LƯU DỮ LIỆU")
         btn_del = st.form_submit_button("🗑️ XÓA DÒNG")
 
-        # --- QUY TRÌNH 5 BƯỚC AN TOÀN KHI LƯU ---
+        # --- XỬ LÝ LƯU ---
         if btn_save:
-            stt_v = stt.strip()
-            if not stt_v: st.error("⚠️ STT không được để trống!")
-            else:
-                try:
-                    fresh_data = pd.DataFrame(sheet.get_all_records())
-                    data = [sel_team, sel_type, sel_week, sel_staff, stt_v, content]
-                    if sel_type == "Đăng ký lịch tuần":
-                        data += ["", "", "", "", date_time, location, host, participants, note]
-                    else:
-                        data += [leader, progress, status, product, "", "", "", "", ""]
+            try:
+                # Đọc lại dữ liệu thực tế
+                fresh_df = pd.DataFrame(sheet.get_all_records())
+                data_list = [sel_team, sel_type, sel_week, sel_staff, stt_val, content]
+                if sel_type == "Đăng ký lịch tuần":
+                    data_list += ["", "", "", "", date_time, location, host, participants, note]
+                else:
+                    data_list += [leader, progress, status, product, "", "", "", "", ""]
 
-                    if selected_stt == "-- Thêm mới --":
-                        sheet.append_row(data)
-                        if sel_type == "Đăng ký công việc":
-                            sync_data = data.copy()
-                            sync_data[1] = "Báo cáo công việc" # Đồng bộ sang Báo cáo
-                            sheet.append_row(sync_data)
-                    else:
-                        mask = (fresh_data['team'] == sel_team) & (fresh_data['week'] == sel_week) & (fresh_data['type'] == sel_type) & (fresh_data['stt'].astype(str) == selected_stt)
-                        if sel_type != "Đăng ký lịch tuần": mask &= (fresh_data['staff'] == sel_staff)
-                        indices = fresh_data[mask].index.tolist()
-                        if indices: sheet.update(f"A{indices[0]+2}:O{indices[0]+2}", [data])
-                    st.success("✅ Đã lưu!")
-                    st.rerun()
-                except Exception as e: st.error(f"Lỗi: {e}")
+                if selected_stt == "-- Thêm mới --":
+                    sheet.append_row(data_list)
+                    if sel_type == "Đăng ký công việc":
+                        sync_data = data_list.copy()
+                        sync_data[1] = "Báo cáo công việc"
+                        sheet.append_row(sync_data)
+                else:
+                    mask = (fresh_df['team'] == sel_team) & (fresh_df['week'] == sel_week) & (fresh_df['type'] == sel_type) & (fresh_df['stt'].astype(str) == selected_stt)
+                    if sel_type != "Đăng ký lịch tuần": mask &= (fresh_df['staff'] == sel_staff)
+                    indices = fresh_df[mask].index.tolist()
+                    if indices:
+                        sheet.update(f"A{indices[0]+2}:O{indices[0]+2}", [data_list])
+                st.success("✅ Đã lưu thành công!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Lỗi khi lưu: {e}")
 
-        # --- QUY TRÌNH 5 BƯỚC AN TOÀN KHI XÓA ---
+        # --- XỬ LÝ XÓA (SỬA LỖI NHẢY ĐỎ) ---
         if btn_del and selected_stt != "-- Thêm mới --":
             try:
-                fresh_data = pd.DataFrame(sheet.get_all_records())
-                mask = (fresh_data['team'] == sel_team) & (fresh_data['week'] == sel_week) & (fresh_data['type'] == sel_type) & (fresh_data['stt'].astype(str) == selected_stt)
-                if sel_type != "Đăng ký lịch tuần": mask &= (fresh_data['staff'] == sel_staff)
-                indices = fresh_data[mask].index.tolist()
+                # 1. Đọc lại dữ liệu mới nhất
+                fresh_df = pd.DataFrame(sheet.get_all_records())
+                # 2. Tìm dòng chính xác
+                mask = (fresh_df['team'] == sel_team) & (fresh_df['week'] == sel_week) & (fresh_df['type'] == sel_type) & (fresh_df['stt'].astype(str) == selected_stt)
+                if sel_type != "Đăng ký lịch tuần": mask &= (fresh_df['staff'] == sel_staff)
+                
+                indices = fresh_df[mask].index.tolist()
+                # 3. Chỉ thực hiện xóa nếu tìm thấy index (Ngăn lỗi TypeError)
                 if indices:
-                    for idx in reversed(indices): sheet.delete_rows(idx + 2)
-                    st.success("✅ Đã xóa!")
+                    for idx in reversed(indices):
+                        sheet.delete_rows(int(idx) + 2)
+                    st.success("✅ Đã xóa thành công!")
                     st.rerun()
-            except Exception as e: st.error(f"Lỗi khi xóa: {e}")
+                else:
+                    st.warning("⚠️ Không tìm thấy dòng dữ liệu thực tế trên Sheets.")
+            except Exception as e:
+                st.error(f"Lỗi hệ thống khi xóa: {e}")
 
-    # --- 5. HIỂN THỊ VÀ BIỂU ĐỒ ---
+    # --- 5. HIỂN THỊ DỮ LIỆU & BIỂU ĐỒ (GIỮ NGUYÊN) ---
     st.subheader("📊 Bảng dữ liệu hiện tại")
     st.dataframe(filtered_df, use_container_width=True)
 
-    # Hiển thị biểu đồ hiệu suất
+    # Biểu đồ hiệu suất
     st.divider()
-    st.header("📈 BIỂU ĐỒ HIỆU SUẤT")
     report_data = all_data[(all_data['type'] == "Báo cáo công việc") & (all_data['week'] == sel_week)]
     if not report_data.empty:
         c1, c2 = st.columns(2)
